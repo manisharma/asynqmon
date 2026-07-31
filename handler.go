@@ -1,10 +1,12 @@
 package asynqmon
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/hibiken/asynq"
@@ -46,6 +48,8 @@ type Options struct {
 
 // HTTPHandler is a http.Handler for asynqmon application.
 type HTTPHandler struct {
+	opts     Options
+	isClosed bool
 	router   *mux.Router
 	closers  []func() error
 	rootPath string // the value should not have the trailing slash
@@ -60,23 +64,56 @@ func New(opts Options) *HTTPHandler {
 	if opts.RedisConnOpt == nil {
 		panic("asynqmon.New: RedisConnOpt field is required")
 	}
-	rc, ok := opts.RedisConnOpt.MakeRedisClient().(redis.UniversalClient)
-	if !ok {
-		panic(fmt.Sprintf("asnyqmon.New: unsupported RedisConnOpt type %T", opts.RedisConnOpt))
+	rc, err := connectToRedis(opts) // Check if RedisConnOpt is valid.
+	if err != nil {
+		panic(err)
 	}
 	i := asynq.NewInspector(opts.RedisConnOpt)
 
 	// Make sure that RootPath starts with a slash if provided.
 	if opts.RootPath != "" && !strings.HasPrefix(opts.RootPath, "/") {
-		panic(fmt.Sprintf("asynqmon.New: RootPath must start with a slash"))
+		panic("asynqmon.New: RootPath must start with a slash")
 	}
 	// Remove tailing slash from RootPath.
 	opts.RootPath = strings.TrimSuffix(opts.RootPath, "/")
 
-	return &HTTPHandler{
+	h := &HTTPHandler{
+		opts:     opts,
 		router:   muxRouter(opts, rc, i),
 		closers:  []func() error{rc.Close, i.Close},
 		rootPath: opts.RootPath,
+	}
+	go h.periodicPingRedisAndConnectIfFailed(rc)
+	return h
+}
+
+func connectToRedis(opts Options) (redis.UniversalClient, error) {
+	client, ok := opts.RedisConnOpt.MakeRedisClient().(redis.UniversalClient)
+	if !ok {
+		return nil, fmt.Errorf("asnyqmon.New: unsupported RedisConnOpt type %T", opts.RedisConnOpt)
+	}
+	return client, nil
+}
+
+func (h *HTTPHandler) periodicPingRedisAndConnectIfFailed(rc redis.UniversalClient) error {
+	if rc == nil {
+		return fmt.Errorf("redis client is nil")
+	}
+	for {
+		if h.isClosed {
+			return fmt.Errorf("HTTPHandler is closed, stop pinging redis")
+		}
+		if _, err := rc.Ping(context.Background()).Result(); err != nil {
+			fmt.Printf("redis.Ping() failed, reconnecting: %v\n", err)
+			rc, err = connectToRedis(h.opts)
+			if err != nil {
+				fmt.Printf("failed to reconnect to redis: %v\n", err)
+			} else {
+				i := asynq.NewInspector(h.opts.RedisConnOpt)
+				h.router = muxRouter(h.opts, rc, i)
+			}
+		}
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -87,6 +124,7 @@ func (h *HTTPHandler) Close() error {
 			return err
 		}
 	}
+	h.isClosed = true
 	return nil
 }
 
