@@ -206,11 +206,12 @@ func main() {
 	}
 
 	h := asynqmon.New(asynqmon.Options{
-		RedisConnOpt:      redisConnOpt,
-		PayloadFormatter:  asynqmon.PayloadFormatterFunc(payloadFormatterFunc(cfg)),
-		ResultFormatter:   asynqmon.ResultFormatterFunc(resultFormatterFunc(cfg)),
-		PrometheusAddress: cfg.PrometheusServerAddr,
-		ReadOnly:          cfg.ReadOnly,
+		RedisConnOpt:         redisConnOpt,
+		PayloadFormatter:     asynqmon.PayloadFormatterFunc(payloadFormatterFunc(cfg)),
+		FullPayloadFormatter: asynqmon.DefaultPayloadFormatter,
+		ResultFormatter:      asynqmon.ResultFormatterFunc(resultFormatterFunc(cfg)),
+		PrometheusAddress:    cfg.PrometheusServerAddr,
+		ReadOnly:             cfg.ReadOnly,
 	})
 	defer h.Close()
 

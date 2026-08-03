@@ -31,6 +31,11 @@ type Options struct {
 	// This field is optional.
 	PayloadFormatter PayloadFormatter
 
+	// FullPayloadFormatter is used to convert payload bytes to string for task detail responses.
+	//
+	// This field is optional. If unset, PayloadFormatter is used.
+	FullPayloadFormatter PayloadFormatter
+
 	// ResultFormatter is used to convert result bytes to string shown in the UI.
 	//
 	// This field is optional.
@@ -145,6 +150,11 @@ func muxRouter(opts Options, rc redis.UniversalClient, inspector *asynq.Inspecto
 		payloadFmt = opts.PayloadFormatter
 	}
 
+	fullPayloadFmt := payloadFmt
+	if opts.FullPayloadFormatter != nil {
+		fullPayloadFmt = opts.FullPayloadFormatter
+	}
+
 	var resultFmt ResultFormatter = DefaultResultFormatter
 	if opts.ResultFormatter != nil {
 		resultFmt = opts.ResultFormatter
@@ -222,7 +232,7 @@ func muxRouter(opts Options, rc redis.UniversalClient, inspector *asynq.Inspecto
 	api.HandleFunc("/queues/{qname}/groups/{gname}/aggregating_tasks:archive_all", newArchiveAllAggregatingTasksHandlerFunc(inspector)).Methods("POST")
 	api.HandleFunc("/queues/{qname}/groups/{gname}/aggregating_tasks:batch_archive", newBatchArchiveTasksHandlerFunc(inspector)).Methods("POST")
 
-	api.HandleFunc("/queues/{qname}/tasks/{task_id}", newGetTaskHandlerFunc(inspector, payloadFmt, resultFmt)).Methods("GET")
+	api.HandleFunc("/queues/{qname}/tasks/{task_id}", newGetTaskHandlerFunc(inspector, fullPayloadFmt, resultFmt)).Methods("GET")
 
 	// Groups endponts
 	api.HandleFunc("/queues/{qname}/groups", newListGroupsHandlerFunc(inspector)).Methods("GET")
