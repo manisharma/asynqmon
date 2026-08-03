@@ -29,10 +29,16 @@ export interface ListAggregatingTasksResponse {
 
 export interface ListServersResponse {
   servers: ServerInfo[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface ListSchedulerEntriesResponse {
   entries: SchedulerEntry[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface ListSchedulerEnqueueEventsResponse {
@@ -1039,18 +1045,24 @@ export async function deleteAllCompletedTasks(
   return resp.data;
 }
 
-export async function listServers(): Promise<ListServersResponse> {
+export async function listServers(
+  options: ListQueuesOptions = {}
+): Promise<ListServersResponse> {
   const resp = await axios({
     method: "get",
     url: `${getBaseUrl()}/servers`,
+    params: options,
   });
   return resp.data;
 }
 
-export async function listSchedulerEntries(): Promise<ListSchedulerEntriesResponse> {
+export async function listSchedulerEntries(
+  options: ListQueuesOptions = {}
+): Promise<ListSchedulerEntriesResponse> {
   const resp = await axios({
     method: "get",
     url: `${getBaseUrl()}/scheduler_entries`,
+    params: options,
   });
   return resp.data;
 }

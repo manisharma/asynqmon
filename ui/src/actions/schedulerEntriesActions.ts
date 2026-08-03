@@ -3,6 +3,7 @@ import {
   listSchedulerEnqueueEvents,
   ListSchedulerEnqueueEventsResponse,
   listSchedulerEntries,
+  ListQueuesOptions,
   ListSchedulerEntriesResponse,
 } from "../api";
 import { toErrorString, toErrorStringWithHttpStatus } from "../utils";
@@ -58,11 +59,11 @@ export type SchedulerEntriesActionTypes =
   | ListSchedulerEnqueueEventSuccessAction
   | ListSchedulerEnqueueEventErrorAction;
 
-export function listSchedulerEntriesAsync() {
+export function listSchedulerEntriesAsync(options: ListQueuesOptions = {}) {
   return async (dispatch: Dispatch<SchedulerEntriesActionTypes>) => {
     dispatch({ type: LIST_SCHEDULER_ENTRIES_BEGIN });
     try {
-      const response = await listSchedulerEntries();
+      const response = await listSchedulerEntries(options);
       dispatch({
         type: LIST_SCHEDULER_ENTRIES_SUCCESS,
         payload: response,
