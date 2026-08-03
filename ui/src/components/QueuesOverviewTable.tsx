@@ -11,6 +11,7 @@ import TableRow from "@material-ui/core/TableRow";
 import TableSortLabel from "@material-ui/core/TableSortLabel";
 import TablePagination from "@material-ui/core/TablePagination";
 import TextField from "@material-ui/core/TextField";
+import Button from "@material-ui/core/Button";
 import IconButton from "@material-ui/core/IconButton";
 import Tooltip from "@material-ui/core/Tooltip";
 import PauseCircleFilledIcon from "@material-ui/icons/PauseCircleFilled";
@@ -27,6 +28,11 @@ import { percentage } from "../utils";
 const useStyles = makeStyles((theme) => ({
   table: {
     minWidth: 650,
+  },
+  searchControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(1),
   },
   fixedCell: {
     position: "sticky",
@@ -49,8 +55,11 @@ interface Props {
   pageSize: number;
   total: number;
   search: string;
+  taskID: string;
   onPageChange: (page: number) => void;
   onSearchChange: (search: string) => void;
+  onTaskIDChange: (taskID: string) => void;
+  onTaskIDSearch: () => void;
 }
 
 enum SortBy {
@@ -188,13 +197,35 @@ export default function QueuesOverviewTable(props: Props) {
   return (
     <React.Fragment>
       <TableContainer>
-        <TextField
-          label="Search queues"
-          value={props.search}
-          onChange={(event) => props.onSearchChange(event.target.value)}
-          variant="outlined"
-          margin="dense"
-        />
+        <div className={classes.searchControls}>
+          <TextField
+            label="Search queues"
+            value={props.search}
+            onChange={(event) => props.onSearchChange(event.target.value)}
+            variant="outlined"
+            margin="dense"
+          />
+          <TextField
+            label="Task ID"
+            value={props.taskID}
+            onChange={(event) => props.onTaskIDChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                props.onTaskIDSearch();
+              }
+            }}
+            variant="outlined"
+            margin="dense"
+          />
+          <Button
+            color="primary"
+            variant="contained"
+            onClick={props.onTaskIDSearch}
+          >
+            Find task
+          </Button>
+        </div>
         <Table className={classes.table} aria-label="queues overview table">
           <TableHead>
             <TableRow>

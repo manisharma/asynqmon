@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/hibiken/asynq"
@@ -16,9 +17,10 @@ import (
 )
 
 const (
-	defaultQueuePageSize  = 50
+	defaultQueuePageSize  = 10
 	maxQueuePageSize      = 100
 	queueInspectorWorkers = 10
+	taskLookupTimeout     = 15 * time.Second
 )
 
 type queuePage struct {
@@ -61,6 +63,81 @@ func selectQueuePage(qnames []string, page queuePage, search string) ([]string, 
 	}
 	end := min(start+page.Size, len(filtered))
 	return filtered[start:end], page
+}
+
+func taskIDFromRequest(r *http.Request) (string, error) {
+	taskID := strings.TrimSpace(r.URL.Query().Get("task_id"))
+	if taskID == "" {
+		return "", nil
+	}
+	if len(taskID) > 512 || strings.ContainsAny(taskID, "*?[]\\") {
+		return "", errors.New("task_id contains unsupported characters")
+	}
+	return taskID, nil
+}
+
+func queueNamesForTaskID(ctx context.Context, rc redis.UniversalClient, taskID string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, taskLookupTimeout)
+	defer cancel()
+
+	pattern := "asynq:{*}:t:" + taskID
+	suffix := "}:t:" + taskID
+	matches := make(map[string]struct{})
+	var cursor uint64
+	for {
+		keys, nextCursor, err := rc.Scan(ctx, cursor, pattern, 100_000).Result()
+		if err != nil {
+			return nil, err
+		}
+		for _, key := range keys {
+			qname, ok := strings.CutPrefix(key, "asynq:{")
+			if !ok {
+				continue
+			}
+			qname, ok = strings.CutSuffix(qname, suffix)
+			if ok {
+				matches[qname] = struct{}{}
+			}
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	qnames := make([]string, 0, len(matches))
+	for qname := range matches {
+		qnames = append(qnames, qname)
+	}
+	return qnames, nil
+}
+
+func queuesForRequest(ctx context.Context, inspector *asynq.Inspector, rc redis.UniversalClient, page queuePage, search, taskID string) ([]string, queuePage, error) {
+	qnames, err := inspector.Queues()
+	if err != nil {
+		return nil, queuePage{}, err
+	}
+	if taskID == "" {
+		qnames, page = selectQueuePage(qnames, page, search)
+		return qnames, page, nil
+	}
+
+	taskQueues, err := queueNamesForTaskID(ctx, rc, taskID)
+	if err != nil {
+		return nil, queuePage{}, err
+	}
+	matchedQueues := make(map[string]struct{}, len(taskQueues))
+	for _, qname := range taskQueues {
+		matchedQueues[qname] = struct{}{}
+	}
+	filtered := qnames[:0]
+	for _, qname := range qnames {
+		if _, ok := matchedQueues[qname]; ok {
+			filtered = append(filtered, qname)
+		}
+	}
+	qnames, page = selectQueuePage(filtered, page, search)
+	return qnames, page, nil
 }
 
 func queueSnapshots(inspector *asynq.Inspector, qnames []string) ([]*queueStateSnapshot, error) {
@@ -109,19 +186,23 @@ type listQueuesResponse struct {
 	queuePage
 }
 
-func newListQueuesHandlerFunc(inspector *asynq.Inspector) http.HandlerFunc {
+func newListQueuesHandlerFunc(inspector *asynq.Inspector, rc redis.UniversalClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, search, err := queuePageFromRequest(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		qnames, err := inspector.Queues()
+		taskID, err := taskIDFromRequest(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		qnames, page, err := queuesForRequest(r.Context(), inspector, rc, page, search, taskID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		qnames, page = selectQueuePage(qnames, page, search)
 		snapshots, err := queueSnapshots(inspector, qnames)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -223,19 +304,23 @@ type listQueueStatsResponse struct {
 	queuePage
 }
 
-func newListQueueStatsHandlerFunc(inspector *asynq.Inspector) http.HandlerFunc {
+func newListQueueStatsHandlerFunc(inspector *asynq.Inspector, rc redis.UniversalClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, search, err := queuePageFromRequest(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		qnames, err := inspector.Queues()
+		taskID, err := taskIDFromRequest(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		qnames, page, err := queuesForRequest(r.Context(), inspector, rc, page, search, taskID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		qnames, page = selectQueuePage(qnames, page, search)
 		resp := listQueueStatsResponse{Stats: make(map[string][]*dailyStats), queuePage: page}
 		const numdays = 90 // Get stats for the last 90 days.
 		for _, qname := range qnames {
