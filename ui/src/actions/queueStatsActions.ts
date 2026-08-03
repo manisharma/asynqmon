@@ -1,5 +1,9 @@
 import { Dispatch } from "redux";
-import { listQueueStats, ListQueueStatsResponse } from "../api";
+import {
+  listQueueStats,
+  ListQueueStatsResponse,
+  ListQueuesOptions,
+} from "../api";
 import { toErrorString, toErrorStringWithHttpStatus } from "../utils";
 
 export const LIST_QUEUE_STATS_BEGIN = "LIST_QUEUE_STATS_BEGIN";
@@ -26,11 +30,11 @@ export type QueueStatsActionTypes =
   | ListQueueStatsSuccessAction
   | ListQueueStatsErrorAction;
 
-export function listQueueStatsAsync() {
+export function listQueueStatsAsync(options: ListQueuesOptions = {}) {
   return async (dispatch: Dispatch<QueueStatsActionTypes>) => {
     dispatch({ type: LIST_QUEUE_STATS_BEGIN });
     try {
-      const response = await listQueueStats();
+      const response = await listQueueStats(options);
       dispatch({
         type: LIST_QUEUE_STATS_SUCCESS,
         payload: response,

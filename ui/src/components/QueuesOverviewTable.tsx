@@ -9,6 +9,8 @@ import TableContainer from "@material-ui/core/TableContainer";
 import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
 import TableSortLabel from "@material-ui/core/TableSortLabel";
+import TablePagination from "@material-ui/core/TablePagination";
+import TextField from "@material-ui/core/TextField";
 import IconButton from "@material-ui/core/IconButton";
 import Tooltip from "@material-ui/core/Tooltip";
 import PauseCircleFilledIcon from "@material-ui/icons/PauseCircleFilled";
@@ -43,6 +45,12 @@ interface Props {
   onPauseClick: (qname: string) => Promise<void>;
   onResumeClick: (qname: string) => Promise<void>;
   onDeleteClick: (qname: string) => Promise<void>;
+  page: number;
+  pageSize: number;
+  total: number;
+  search: string;
+  onPageChange: (page: number) => void;
+  onSearchChange: (search: string) => void;
 }
 
 enum SortBy {
@@ -180,6 +188,13 @@ export default function QueuesOverviewTable(props: Props) {
   return (
     <React.Fragment>
       <TableContainer>
+        <TextField
+          label="Search queues"
+          value={props.search}
+          onChange={(event) => props.onSearchChange(event.target.value)}
+          variant="outlined"
+          margin="dense"
+        />
         <Table className={classes.table} aria-label="queues overview table">
           <TableHead>
             <TableRow>
@@ -221,6 +236,14 @@ export default function QueuesOverviewTable(props: Props) {
             ))}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={props.total}
+          page={props.page - 1}
+          onPageChange={(_, page) => props.onPageChange(page + 1)}
+          rowsPerPage={props.pageSize}
+          rowsPerPageOptions={[props.pageSize]}
+        />
       </TableContainer>
       <DeleteQueueConfirmationDialog
         onClose={handleDialogClose}

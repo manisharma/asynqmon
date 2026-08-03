@@ -74,6 +74,9 @@ interface QueuesState {
   loading: boolean;
   data: QueueInfo[];
   error: string;
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface QueueInfo {
@@ -82,7 +85,14 @@ export interface QueueInfo {
   requestPending: boolean; // indicates pause/resume/delete action is pending on this queue
 }
 
-const initialState: QueuesState = { data: [], loading: false, error: "" };
+const initialState: QueuesState = {
+  data: [],
+  loading: false,
+  error: "",
+  page: 1,
+  size: 50,
+  total: 0,
+};
 
 function queuesReducer(
   state = initialState,
@@ -103,6 +113,9 @@ function queuesReducer(
           currentStats: q,
           requestPending: false,
         })),
+        page: action.payload.page,
+        size: action.payload.size,
+        total: action.payload.total,
       };
 
     case LIST_QUEUES_ERROR:

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { connect, ConnectedProps } from "react-redux";
 import Container from "@material-ui/core/Container";
 import { makeStyles } from "@material-ui/core/styles";
@@ -73,6 +73,8 @@ function mapStateToProps(state: AppState) {
     error: state.queues.error,
     pollInterval: state.settings.pollInterval,
     queueStats: state.queueStats.data,
+    pageSize: state.queues.size,
+    total: state.queues.total,
     dailyStatsKey: state.settings.dailyStatsChartType,
   };
 }
@@ -100,10 +102,18 @@ function DashboardView(props: Props) {
     queues,
     listQueueStatsAsync,
     dailyStatsKey,
+    pageSize,
+    total,
   } = props;
   const classes = useStyles();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [search, setSearch] = useState("");
 
-  usePolling(listQueuesAsync, pollInterval);
+  const listQueues = useCallback(
+    () => listQueuesAsync({ page: currentPage, size: pageSize, search }),
+    [currentPage, listQueuesAsync, pageSize, search]
+  );
+  usePolling(listQueues, pollInterval);
 
   // Refetch queue stats if a queue is added or deleted.
   const qnames = queues
@@ -112,8 +122,8 @@ function DashboardView(props: Props) {
     .join(",");
 
   useEffect(() => {
-    listQueueStatsAsync();
-  }, [listQueueStatsAsync, qnames]);
+    listQueueStatsAsync({ page: currentPage, size: pageSize, search });
+  }, [currentPage, listQueueStatsAsync, pageSize, qnames, search]);
 
   const processedStats = queues.map((q) => ({
     queue: q.queue,
@@ -242,6 +252,15 @@ function DashboardView(props: Props) {
               onPauseClick={props.pauseQueueAsync}
               onResumeClick={props.resumeQueueAsync}
               onDeleteClick={props.deleteQueueAsync}
+              page={currentPage}
+              pageSize={pageSize}
+              total={total}
+              search={search}
+              onPageChange={setCurrentPage}
+              onSearchChange={(nextSearch) => {
+                setSearch(nextSearch);
+                setCurrentPage(1);
+              }}
             />
           </Paper>
         </Grid>

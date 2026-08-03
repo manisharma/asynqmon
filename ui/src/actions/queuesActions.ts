@@ -2,6 +2,7 @@ import { Dispatch } from "redux";
 import {
   deleteQueue,
   listQueues,
+  ListQueuesOptions,
   ListQueuesResponse,
   pauseQueue,
   resumeQueue,
@@ -99,11 +100,11 @@ export type QueuesActionTypes =
   | ResumeQueueSuccessAction
   | ResumeQueueErrorAction;
 
-export function listQueuesAsync() {
+export function listQueuesAsync(options: ListQueuesOptions = {}) {
   return async (dispatch: Dispatch<QueuesActionTypes>) => {
     dispatch({ type: LIST_QUEUES_BEGIN });
     try {
-      const response = await listQueues();
+      const response = await listQueues(options);
       dispatch({
         type: LIST_QUEUES_SUCCESS,
         payload: response,
