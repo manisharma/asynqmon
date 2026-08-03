@@ -153,14 +153,14 @@ func muxRouter(opts Options, rc redis.UniversalClient, inspector *asynq.Inspecto
 	api := router.PathPrefix("/api").Subrouter()
 
 	// Queue endpoints.
-	api.HandleFunc("/queues", newListQueuesHandlerFunc(inspector)).Methods("GET")
+	api.HandleFunc("/queues", newListQueuesHandlerFunc(inspector, rc)).Methods("GET")
 	api.HandleFunc("/queues/{qname}", newGetQueueHandlerFunc(inspector)).Methods("GET")
 	api.HandleFunc("/queues/{qname}", newHardDeleteQueueHandlerFunc(inspector, rc)).Methods("DELETE")
 	api.HandleFunc("/queues/{qname}:pause", newPauseQueueHandlerFunc(inspector)).Methods("POST")
 	api.HandleFunc("/queues/{qname}:resume", newResumeQueueHandlerFunc(inspector)).Methods("POST")
 
 	// Queue Historical Stats endpoint.
-	api.HandleFunc("/queue_stats", newListQueueStatsHandlerFunc(inspector)).Methods("GET")
+	api.HandleFunc("/queue_stats", newListQueueStatsHandlerFunc(inspector, rc)).Methods("GET")
 
 	// Task endpoints.
 	api.HandleFunc("/queues/{qname}/active_tasks", newListActiveTasksHandlerFunc(inspector, payloadFmt)).Methods("GET")

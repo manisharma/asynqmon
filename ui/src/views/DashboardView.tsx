@@ -108,10 +108,18 @@ function DashboardView(props: Props) {
   const classes = useStyles();
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [taskID, setTaskID] = useState("");
+  const [appliedTaskID, setAppliedTaskID] = useState("");
 
   const listQueues = useCallback(
-    () => listQueuesAsync({ page: currentPage, size: pageSize, search }),
-    [currentPage, listQueuesAsync, pageSize, search]
+    () =>
+      listQueuesAsync({
+        page: currentPage,
+        size: pageSize,
+        search,
+        task_id: appliedTaskID,
+      }),
+    [appliedTaskID, currentPage, listQueuesAsync, pageSize, search]
   );
   usePolling(listQueues, pollInterval);
 
@@ -122,8 +130,13 @@ function DashboardView(props: Props) {
     .join(",");
 
   useEffect(() => {
-    listQueueStatsAsync({ page: currentPage, size: pageSize, search });
-  }, [currentPage, listQueueStatsAsync, pageSize, qnames, search]);
+    listQueueStatsAsync({
+      page: currentPage,
+      size: pageSize,
+      search,
+      task_id: appliedTaskID,
+    });
+  }, [appliedTaskID, currentPage, listQueueStatsAsync, pageSize, qnames, search]);
 
   const processedStats = queues.map((q) => ({
     queue: q.queue,
@@ -256,9 +269,21 @@ function DashboardView(props: Props) {
               pageSize={pageSize}
               total={total}
               search={search}
+              taskID={taskID}
               onPageChange={setCurrentPage}
               onSearchChange={(nextSearch) => {
                 setSearch(nextSearch);
+                setCurrentPage(1);
+              }}
+              onTaskIDChange={(nextTaskID) => {
+                setTaskID(nextTaskID);
+                if (nextTaskID.trim() === "") {
+                  setAppliedTaskID("");
+                  setCurrentPage(1);
+                }
+              }}
+              onTaskIDSearch={() => {
+                setAppliedTaskID(taskID);
                 setCurrentPage(1);
               }}
             />

@@ -14,7 +14,7 @@ func TestQueuePageFromRequest(t *testing.T) {
 		search string
 		err    bool
 	}{
-		{name: "defaults", target: "/api/queues", want: queuePage{Page: 1, Size: 50}},
+		{name: "defaults", target: "/api/queues", want: queuePage{Page: 1, Size: 10}},
 		{name: "parameters", target: "/api/queues?page=2&size=25&search=Payments", want: queuePage{Page: 2, Size: 25}, search: "payments"},
 		{name: "zero page", target: "/api/queues?page=0", err: true},
 		{name: "oversized page", target: "/api/queues?size=101", err: true},
@@ -53,6 +53,27 @@ func TestHardDeleteQueueRejectsUnsafeNames(t *testing.T) {
 	for _, qname := range []string{"", "queue*", "queue?", "queue[1]", `queue\name`} {
 		if err := hardDeleteQueue(nil, nil, qname); err == nil {
 			t.Errorf("hardDeleteQueue(%q) returned nil error", qname)
+		}
+	}
+}
+
+func TestTaskIDFromRequest(t *testing.T) {
+	tests := []struct {
+		target string
+		want   string
+		err    bool
+	}{
+		{target: "/api/queues", want: ""},
+		{target: "/api/queues?task_id=AG-ID-123", want: "AG-ID-123"},
+		{target: "/api/queues?task_id=task*", err: true},
+	}
+	for _, tc := range tests {
+		taskID, err := taskIDFromRequest(httptest.NewRequest("GET", tc.target, nil))
+		if (err != nil) != tc.err {
+			t.Fatalf("taskIDFromRequest(%q) error = %v, want error: %v", tc.target, err, tc.err)
+		}
+		if taskID != tc.want {
+			t.Fatalf("taskIDFromRequest(%q) = %q, want %q", tc.target, taskID, tc.want)
 		}
 	}
 }

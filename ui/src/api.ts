@@ -369,6 +369,7 @@ export interface PaginationOptions {
 
 export interface ListQueuesOptions extends PaginationOptions {
   search?: string;
+  task_id?: string;
 }
 
 export async function listQueues(
