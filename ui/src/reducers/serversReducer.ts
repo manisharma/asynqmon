@@ -10,12 +10,18 @@ interface ServersState {
   loading: boolean;
   error: string;
   data: ServerInfo[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 const initialState: ServersState = {
   loading: false,
   error: "",
   data: [],
+  page: 1,
+  size: 10,
+  total: 0,
 };
 
 export default function serversReducer(
@@ -34,6 +40,9 @@ export default function serversReducer(
         loading: false,
         error: "",
         data: action.payload.servers,
+        page: action.payload.page,
+        size: action.payload.size,
+        total: action.payload.total,
       };
 
     case LIST_SERVERS_ERROR:

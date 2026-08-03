@@ -1,5 +1,5 @@
 import { Dispatch } from "redux";
-import { listServers, ListServersResponse } from "../api";
+import { listServers, ListQueuesOptions, ListServersResponse } from "../api";
 import { toErrorString, toErrorStringWithHttpStatus } from "../utils";
 
 // List of server related action types.
@@ -25,11 +25,11 @@ export type ServersActionTypes =
   | ListServersSuccessAction
   | ListServersErrorAction;
 
-export function listServersAsync() {
+export function listServersAsync(options: ListQueuesOptions = {}) {
   return async (dispatch: Dispatch<ServersActionTypes>) => {
     dispatch({ type: LIST_SERVERS_BEGIN });
     try {
-      const response = await listServers();
+      const response = await listServers(options);
       dispatch({
         type: LIST_SERVERS_SUCCESS,
         payload: response,

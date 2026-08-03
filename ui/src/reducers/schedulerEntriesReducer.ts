@@ -14,6 +14,9 @@ interface SchedulerEntriesState {
   loading: boolean;
   data: SchedulerEntry[];
   error: string; // error description
+  page: number;
+  size: number;
+  total: number;
   enqueueEventsByEntryId: {
     [entryId: string]: { data: SchedulerEnqueueEvent[]; loading: boolean };
   };
@@ -30,6 +33,9 @@ const initialState: SchedulerEntriesState = {
   loading: false,
   data: [],
   error: "",
+  page: 1,
+  size: 10,
+  total: 0,
   enqueueEventsByEntryId: {},
 };
 
@@ -49,6 +55,9 @@ function schedulerEntriesReducer(
         error: "",
         loading: false,
         data: action.payload.entries,
+        page: action.payload.page,
+        size: action.payload.size,
+        total: action.payload.total,
       };
     case LIST_SCHEDULER_ENTRIES_ERROR:
       return {

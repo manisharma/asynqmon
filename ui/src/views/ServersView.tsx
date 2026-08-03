@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { connect, ConnectedProps } from "react-redux";
 import Container from "@material-ui/core/Container";
 import { makeStyles } from "@material-ui/core/styles";
@@ -7,6 +7,8 @@ import Paper from "@material-ui/core/Paper";
 import Typography from "@material-ui/core/Typography";
 import Alert from "@material-ui/lab/Alert";
 import AlertTitle from "@material-ui/lab/AlertTitle";
+import TablePagination from "@material-ui/core/TablePagination";
+import TextField from "@material-ui/core/TextField";
 import ServersTable from "../components/ServersTable";
 import { listServersAsync } from "../actions/serversActions";
 import { AppState } from "../store";
@@ -34,6 +36,8 @@ function mapStateToProps(state: AppState) {
     loading: state.servers.loading,
     error: state.servers.error,
     servers: state.servers.data,
+    pageSize: state.servers.size,
+    total: state.servers.total,
     pollInterval: state.settings.pollInterval,
   };
 }
@@ -43,10 +47,16 @@ const connector = connect(mapStateToProps, { listServersAsync });
 type Props = ConnectedProps<typeof connector>;
 
 function ServersView(props: Props) {
-  const { pollInterval, listServersAsync } = props;
+  const { pollInterval, listServersAsync, pageSize, total } = props;
   const classes = useStyles();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
 
-  usePolling(listServersAsync, pollInterval);
+  const listServers = useCallback(
+    () => listServersAsync({ page, size: pageSize, search }),
+    [listServersAsync, page, pageSize, search]
+  );
+  usePolling(listServers, pollInterval);
 
   return (
     <Container maxWidth="lg" className={classes.container}>
@@ -57,7 +67,25 @@ function ServersView(props: Props) {
               <Typography variant="h6" className={classes.heading}>
                 Servers
               </Typography>
+              <TextField
+                label="Search hosts"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                variant="outlined"
+                margin="dense"
+              />
               <ServersTable servers={props.servers} />
+              <TablePagination
+                component="div"
+                count={total}
+                page={page - 1}
+                onPageChange={(_, nextPage) => setPage(nextPage + 1)}
+                rowsPerPage={pageSize}
+                rowsPerPageOptions={[pageSize]}
+              />
             </Paper>
           </Grid>
         ) : (
