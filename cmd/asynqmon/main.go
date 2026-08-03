@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	"github.com/hibiken/asynq/x/metrics"
 	"github.com/hibiken/asynqmon"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 )
@@ -103,11 +106,10 @@ func makeRedisConnOpt(cfg *Config) (asynq.RedisConnOpt, error) {
 
 	// Connecting to redis-sentinels
 	if strings.HasPrefix(cfg.RedisURL, "redis-sentinel") {
-		res, err := asynq.ParseRedisURI(cfg.RedisURL)
+		connOpt, err := parseRedisSentinelURL(cfg.RedisURL)
 		if err != nil {
 			return nil, err
 		}
-		connOpt := res.(asynq.RedisFailoverClientOpt) // safe to type-assert
 		connOpt.TLSConfig = makeTLSConfig(cfg)
 		return connOpt, nil
 	}
@@ -131,9 +133,65 @@ func makeRedisConnOpt(cfg *Config) (asynq.RedisConnOpt, error) {
 	return connOpt, nil
 }
 
+func parseRedisSentinelURL(rawURL string) (asynq.RedisFailoverClientOpt, error) {
+	const scheme = "redis-sentinel://"
+	if !strings.HasPrefix(rawURL, scheme) {
+		return asynq.RedisFailoverClientOpt{}, fmt.Errorf("invalid Redis Sentinel URL scheme")
+	}
+
+	rest := strings.TrimPrefix(rawURL, scheme)
+	authorityAndPath, rawQuery, _ := strings.Cut(rest, "?")
+	authority, path, _ := strings.Cut(authorityAndPath, "/")
+
+	var sentinelPassword string
+	if userInfo, hosts, ok := strings.Cut(authority, "@"); ok {
+		authority = hosts
+		password := strings.TrimPrefix(userInfo, ":")
+		decoded, err := url.PathUnescape(password)
+		if err != nil {
+			return asynq.RedisFailoverClientOpt{}, fmt.Errorf("decode Redis Sentinel password: %w", err)
+		}
+		sentinelPassword = decoded
+	}
+
+	var sentinelAddrs []string
+	for addr := range strings.SplitSeq(authority, ",") {
+		if addr != "" {
+			sentinelAddrs = append(sentinelAddrs, addr)
+		}
+	}
+	if len(sentinelAddrs) == 0 {
+		return asynq.RedisFailoverClientOpt{}, fmt.Errorf("redis Sentinel URL has no addresses")
+	}
+
+	query, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return asynq.RedisFailoverClientOpt{}, fmt.Errorf("parse Redis Sentinel query: %w", err)
+	}
+	masterName := query.Get("master")
+	if masterName == "" {
+		return asynq.RedisFailoverClientOpt{}, fmt.Errorf("redis Sentinel URL has no master name")
+	}
+
+	var db int
+	if path != "" {
+		db, err = strconv.Atoi(path)
+		if err != nil {
+			return asynq.RedisFailoverClientOpt{}, fmt.Errorf("parse Redis Sentinel database: %w", err)
+		}
+	}
+
+	return asynq.RedisFailoverClientOpt{
+		MasterName:       masterName,
+		SentinelAddrs:    sentinelAddrs,
+		SentinelPassword: sentinelPassword,
+		DB:               db,
+	}, nil
+}
+
 func main() {
 	cfg, output, err := parseFlags(os.Args[0], os.Args[1:])
-	if err == flag.ErrHelp {
+	if errors.Is(err, flag.ErrHelp) {
 		fmt.Println(output)
 		os.Exit(2)
 	} else if err != nil {
@@ -170,8 +228,8 @@ func main() {
 		reg.MustRegister(
 			metrics.NewQueueMetricsCollector(inspector),
 			// Add the standard process and go metrics to the registry
-			prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
-			prometheus.NewGoCollector(),
+			collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+			collectors.NewGoCollector(),
 		)
 		mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	}

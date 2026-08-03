@@ -106,7 +106,18 @@ func TestMakeRedisConnOpt(t *testing.T) {
 				MasterName: "mymaster",
 				SentinelAddrs: []string{
 					"localhost:5000", "localhost:5001", "localhost:5002"},
-				Password: "secretpassword", // FIXME: Shouldn't this be SentinelPassword instead?
+				SentinelPassword: "secretpassword",
+			},
+		},
+		{
+			desc: "With redis-sentinel URL and database",
+			cfg: &Config{
+				RedisURL: "redis-sentinel://localhost:5000,localhost:5001/3?master=mymaster",
+			},
+			want: asynq.RedisFailoverClientOpt{
+				MasterName:    "mymaster",
+				SentinelAddrs: []string{"localhost:5000", "localhost:5001"},
+				DB:            3,
 			},
 		},
 		{

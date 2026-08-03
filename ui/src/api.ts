@@ -11,6 +11,9 @@ const getBaseUrl = () =>
 
 export interface ListQueuesResponse {
   queues: Queue[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface ListTasksResponse {
@@ -359,15 +362,22 @@ export interface SchedulerEnqueueEvent {
   enqueued_at: string;
 }
 
-export interface PaginationOptions extends Record<string, number | undefined> {
+export interface PaginationOptions {
   size?: number; // size of the page
   page?: number; // page number (1 being the first page)
 }
 
-export async function listQueues(): Promise<ListQueuesResponse> {
+export interface ListQueuesOptions extends PaginationOptions {
+  search?: string;
+}
+
+export async function listQueues(
+  options: ListQueuesOptions = {}
+): Promise<ListQueuesResponse> {
   const resp = await axios({
     method: "get",
     url: `${getBaseUrl()}/queues`,
+    params: options,
   });
   return resp.data;
 }
@@ -375,7 +385,7 @@ export async function listQueues(): Promise<ListQueuesResponse> {
 export async function deleteQueue(qname: string): Promise<void> {
   await axios({
     method: "delete",
-    url: `${getBaseUrl()}/queues/${qname}`,
+    url: `${getBaseUrl()}/queues/${qname}?force=true`,
   });
 }
 
@@ -393,10 +403,13 @@ export async function resumeQueue(qname: string): Promise<void> {
   });
 }
 
-export async function listQueueStats(): Promise<ListQueueStatsResponse> {
+export async function listQueueStats(
+  options: ListQueuesOptions = {}
+): Promise<ListQueueStatsResponse> {
   const resp = await axios({
     method: "get",
     url: `${getBaseUrl()}/queue_stats`,
+    params: options,
   });
   return resp.data;
 }
