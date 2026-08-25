@@ -60,6 +60,7 @@ type ReduxProps = ConnectedProps<typeof connector>;
 interface Props {
   queue: string; // name of the queue
   totalTaskCount: number; // total number of active tasks
+  search?: string;
 }
 
 function Row(props: RowProps) {

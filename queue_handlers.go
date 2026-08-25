@@ -29,7 +29,12 @@ type queuePage struct {
 	Total int `json:"total"`
 }
 
-func queuePageFromRequest(r *http.Request) (queuePage, string, error) {
+type queueSort struct {
+	By  string
+	Dir string
+}
+
+func queuePageFromRequestWithSort(r *http.Request) (queuePage, string, queueSort, error) {
 	page := queuePage{Page: 1, Size: defaultQueuePageSize}
 	query := r.URL.Query()
 
@@ -37,18 +42,31 @@ func queuePageFromRequest(r *http.Request) (queuePage, string, error) {
 		if value := query.Get(key); value != "" {
 			parsed, err := strconv.Atoi(value)
 			if err != nil || parsed < 1 {
-				return queuePage{}, "", errors.New(key + " must be a positive integer")
+				return queuePage{}, "", queueSort{}, errors.New(key + " must be a positive integer")
 			}
 			*target = parsed
 		}
 	}
 	if page.Size > maxQueuePageSize {
-		return queuePage{}, "", errors.New("size must not exceed " + strconv.Itoa(maxQueuePageSize))
+		return queuePage{}, "", queueSort{}, errors.New("size must not exceed " + strconv.Itoa(maxQueuePageSize))
 	}
-	return page, strings.ToLower(strings.TrimSpace(query.Get("search"))), nil
+	sortBy := query.Get("sort_by")
+	switch sortBy {
+	case "", "queue", "state", "size", "memory_usage", "latency", "processed", "failed", "error_rate":
+	default:
+		return queuePage{}, "", queueSort{}, errors.New("unsupported sort_by")
+	}
+	sortDir := strings.ToLower(strings.TrimSpace(query.Get("sort_dir")))
+	if sortDir == "" {
+		sortDir = "asc"
+	}
+	if sortDir != "asc" && sortDir != "desc" {
+		return queuePage{}, "", queueSort{}, errors.New("sort_dir must be asc or desc")
+	}
+	return page, strings.ToLower(strings.TrimSpace(query.Get("search"))), queueSort{By: sortBy, Dir: sortDir}, nil
 }
 
-func selectQueuePage(qnames []string, page queuePage, search string) ([]string, queuePage) {
+func filterQueueNames(qnames []string, search string) []string {
 	filtered := make([]string, 0, len(qnames))
 	for _, qname := range qnames {
 		if strings.Contains(strings.ToLower(qname), search) {
@@ -56,6 +74,16 @@ func selectQueuePage(qnames []string, page queuePage, search string) ([]string, 
 		}
 	}
 	sort.Strings(filtered)
+	return filtered
+}
+
+func queuePageFromRequest(r *http.Request) (queuePage, string, error) {
+	page, search, _, err := queuePageFromRequestWithSort(r)
+	return page, search, err
+}
+
+func selectQueuePage(qnames []string, page queuePage, search string) ([]string, queuePage) {
+	filtered := filterQueueNames(qnames, search)
 	page.Total = len(filtered)
 	start := (page.Page - 1) * page.Size
 	if start >= len(filtered) {
@@ -63,6 +91,16 @@ func selectQueuePage(qnames []string, page queuePage, search string) ([]string, 
 	}
 	end := min(start+page.Size, len(filtered))
 	return filtered[start:end], page
+}
+
+func paginateQueues[T any](items []T, page queuePage) ([]T, queuePage) {
+	page.Total = len(items)
+	start := (page.Page - 1) * page.Size
+	if start >= len(items) {
+		return []T{}, page
+	}
+	end := min(start+page.Size, len(items))
+	return items[start:end], page
 }
 
 func taskIDFromRequest(r *http.Request) (string, error) {
@@ -118,7 +156,8 @@ func queuesForRequest(ctx context.Context, inspector *asynq.Inspector, rc redis.
 		return nil, queuePage{}, err
 	}
 	if taskID == "" {
-		qnames, page = selectQueuePage(qnames, page, search)
+		qnames = filterQueueNames(qnames, search)
+		page.Total = len(qnames)
 		return qnames, page, nil
 	}
 
@@ -136,11 +175,78 @@ func queuesForRequest(ctx context.Context, inspector *asynq.Inspector, rc redis.
 			filtered = append(filtered, qname)
 		}
 	}
-	qnames, page = selectQueuePage(filtered, page, search)
+	qnames = filterQueueNames(filtered, search)
+	page.Total = len(qnames)
 	return qnames, page, nil
 }
 
+func sortQueueSnapshots(snapshots []*queueStateSnapshot, order queueSort) {
+	sort.SliceStable(snapshots, func(i, j int) bool {
+		a, b := snapshots[i], snapshots[j]
+		var less bool
+		switch order.By {
+		case "state":
+			less = !a.Paused && b.Paused
+		case "size":
+			less = a.Size < b.Size
+		case "memory_usage":
+			less = a.MemoryUsage < b.MemoryUsage
+		case "latency":
+			less = a.LatencyMillisec < b.LatencyMillisec
+		case "processed":
+			less = a.Processed < b.Processed
+		case "failed":
+			less = a.Failed < b.Failed
+		case "error_rate":
+			less = errorRate(a.Failed, a.Processed) < errorRate(b.Failed, b.Processed)
+		default:
+			less = a.Queue < b.Queue
+		}
+		if a.Queue == b.Queue {
+			return false
+		}
+		if sortQueueSnapshotsEqual(a, b, order) {
+			return a.Queue < b.Queue
+		}
+		if order.Dir == "desc" {
+			return !less
+		}
+		return less
+	})
+}
+
+func errorRate(failed, processed int) float64 {
+	if processed == 0 {
+		return 0
+	}
+	return float64(failed) / float64(processed)
+}
+
+func sortQueueSnapshotsEqual(a, b *queueStateSnapshot, order queueSort) bool {
+	switch order.By {
+	case "state":
+		return a.Paused == b.Paused
+	case "size":
+		return a.Size == b.Size
+	case "memory_usage":
+		return a.MemoryUsage == b.MemoryUsage
+	case "latency":
+		return a.LatencyMillisec == b.LatencyMillisec
+	case "processed":
+		return a.Processed == b.Processed
+	case "failed":
+		return a.Failed == b.Failed
+	case "error_rate":
+		return errorRate(a.Failed, a.Processed) == errorRate(b.Failed, b.Processed)
+	default:
+		return a.Queue == b.Queue
+	}
+}
+
 func queueSnapshots(inspector *asynq.Inspector, qnames []string) ([]*queueStateSnapshot, error) {
+	if len(qnames) == 0 {
+		return []*queueStateSnapshot{}, nil
+	}
 	snapshots := make([]*queueStateSnapshot, len(qnames))
 	jobs := make(chan int)
 	errs := make(chan error, 1)
@@ -188,7 +294,7 @@ type listQueuesResponse struct {
 
 func newListQueuesHandlerFunc(inspector *asynq.Inspector, rc redis.UniversalClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		page, search, err := queuePageFromRequest(r)
+		page, search, order, err := queuePageFromRequestWithSort(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -208,6 +314,8 @@ func newListQueuesHandlerFunc(inspector *asynq.Inspector, rc redis.UniversalClie
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		sortQueueSnapshots(snapshots, order)
+		snapshots, page = paginateQueues(snapshots, page)
 		json.NewEncoder(w).Encode(listQueuesResponse{Queues: snapshots, queuePage: page})
 	}
 }
@@ -306,7 +414,7 @@ type listQueueStatsResponse struct {
 
 func newListQueueStatsHandlerFunc(inspector *asynq.Inspector, rc redis.UniversalClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		page, search, err := queuePageFromRequest(r)
+		page, search, _, err := queuePageFromRequestWithSort(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -321,6 +429,7 @@ func newListQueueStatsHandlerFunc(inspector *asynq.Inspector, rc redis.Universal
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		qnames, page = paginateQueues(qnames, page)
 		resp := listQueueStatsResponse{Stats: make(map[string][]*dailyStats), queuePage: page}
 		const numdays = 90 // Get stats for the last 90 days.
 		for _, qname := range qnames {

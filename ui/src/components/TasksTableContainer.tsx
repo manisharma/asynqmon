@@ -14,7 +14,7 @@ import ArchivedTasksTable from "./ArchivedTasksTable";
 import CompletedTasksTable from "./CompletedTasksTable";
 import AggregatingTasksTableContainer from "./AggregatingTasksTableContainer";
 import { useHistory } from "react-router-dom";
-import { queueDetailsPath, taskDetailsPath } from "../paths";
+import { queueDetailsPath } from "../paths";
 import { QueueInfo } from "../reducers/queuesReducer";
 import { AppState } from "../store";
 import { isDarkTheme } from "../theme";
@@ -193,7 +193,7 @@ function TasksTableContainer(props: Props & ReduxProps) {
               <SearchIcon />
             </div>
             <InputBase
-              placeholder="Search by ID"
+              placeholder="Search by ID or type"
               classes={{
                 root: classes.inputRoot,
                 input: classes.inputInput,
@@ -206,9 +206,7 @@ function TasksTableContainer(props: Props & ReduxProps) {
                 "aria-label": "search",
                 onKeyDown: (e) => {
                   if (e.key === "Enter") {
-                    history.push(
-                      taskDetailsPath(props.queue, searchQuery.trim())
-                    );
+                    e.preventDefault();
                   }
                 },
               }}
@@ -220,12 +218,14 @@ function TasksTableContainer(props: Props & ReduxProps) {
         <ActiveTasksTable
           queue={props.queue}
           totalTaskCount={currentStats.active}
+          search={searchQuery}
         />
       </TabPanel>
       <TabPanel value="pending" selected={props.selected}>
         <PendingTasksTable
           queue={props.queue}
           totalTaskCount={currentStats.pending}
+          search={searchQuery}
         />
       </TabPanel>
       <TabPanel value="aggregating" selected={props.selected}>
@@ -235,24 +235,28 @@ function TasksTableContainer(props: Props & ReduxProps) {
         <ScheduledTasksTable
           queue={props.queue}
           totalTaskCount={currentStats.scheduled}
+          search={searchQuery}
         />
       </TabPanel>
       <TabPanel value="retry" selected={props.selected}>
         <RetryTasksTable
           queue={props.queue}
           totalTaskCount={currentStats.retry}
+          search={searchQuery}
         />
       </TabPanel>
       <TabPanel value="archived" selected={props.selected}>
         <ArchivedTasksTable
           queue={props.queue}
           totalTaskCount={currentStats.archived}
+          search={searchQuery}
         />
       </TabPanel>
       <TabPanel value="completed" selected={props.selected}>
         <CompletedTasksTable
           queue={props.queue}
           totalTaskCount={currentStats.completed}
+          search={searchQuery}
         />
       </TabPanel>
     </Paper>

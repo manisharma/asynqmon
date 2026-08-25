@@ -60,6 +60,9 @@ interface Props {
   onSearchChange: (search: string) => void;
   onTaskIDChange: (taskID: string) => void;
   onTaskIDSearch: () => void;
+  sortBy: string;
+  sortDir: SortDirection;
+  onSortChange: (sortBy: string, sortDir: SortDirection) => void;
 }
 
 enum SortBy {
@@ -112,87 +115,17 @@ const colConfigs: SortableTableColumn<SortBy>[] = [
   { label: "Actions", key: "actions", sortBy: SortBy.None, align: "center" },
 ];
 
-// sortQueues takes a array of queues and return a sorted array.
-// It returns a new array and leave the original array untouched.
-function sortQueues(
-  queues: QueueWithMetadata[],
-  cmpFn: (first: QueueWithMetadata, second: QueueWithMetadata) => number
-): QueueWithMetadata[] {
-  let copy = [...queues];
-  copy.sort(cmpFn);
-  return copy;
-}
-
 export default function QueuesOverviewTable(props: Props) {
   const classes = useStyles();
-  const [sortBy, setSortBy] = useState<SortBy>(SortBy.Queue);
-  const [sortDir, setSortDir] = useState<SortDirection>(SortDirection.Asc);
   const [queueToDelete, setQueueToDelete] = useState<QueueWithMetadata | null>(
     null
   );
-  const createSortClickHandler = (sortKey: SortBy) => (e: React.MouseEvent) => {
-    if (sortKey === sortBy) {
-      // Toggle sort direction.
-      const nextSortDir =
-        sortDir === SortDirection.Asc ? SortDirection.Desc : SortDirection.Asc;
-      setSortDir(nextSortDir);
-    } else {
-      // Change the sort key.
-      setSortBy(sortKey);
-    }
-  };
-
-  const cmpFunc = (q1: QueueWithMetadata, q2: QueueWithMetadata): number => {
-    let isQ1Smaller: boolean;
-    switch (sortBy) {
-      case SortBy.Queue:
-        if (q1.queue === q2.queue) return 0;
-        isQ1Smaller = q1.queue < q2.queue;
-        break;
-      case SortBy.State:
-        if (q1.paused === q2.paused) return 0;
-        isQ1Smaller = !q1.paused;
-        break;
-      case SortBy.Size:
-        if (q1.size === q2.size) return 0;
-        isQ1Smaller = q1.size < q2.size;
-        break;
-      case SortBy.MemoryUsage:
-        if (q1.memory_usage_bytes === q2.memory_usage_bytes) return 0;
-        isQ1Smaller = q1.memory_usage_bytes < q2.memory_usage_bytes;
-        break;
-      case SortBy.Latency:
-        if (q1.latency_msec === q2.latency_msec) return 0;
-        isQ1Smaller = q1.latency_msec < q2.latency_msec;
-        break;
-      case SortBy.Processed:
-        if (q1.processed === q2.processed) return 0;
-        isQ1Smaller = q1.processed < q2.processed;
-        break;
-      case SortBy.Failed:
-        if (q1.failed === q2.failed) return 0;
-        isQ1Smaller = q1.failed < q2.failed;
-        break;
-      case SortBy.ErrorRate:
-        const q1ErrorRate = q1.failed / q1.processed;
-        const q2ErrorRate = q2.failed / q2.processed;
-        if (q1ErrorRate === q2ErrorRate) return 0;
-        isQ1Smaller = q1ErrorRate < q2ErrorRate;
-        break;
-      default:
-        // eslint-disable-next-line no-throw-literal
-        throw `Unexpected order by value: ${sortBy}`;
-    }
-    if (sortDir === SortDirection.Asc) {
-      return isQ1Smaller ? -1 : 1;
-    } else {
-      return isQ1Smaller ? 1 : -1;
-    }
-  };
-
   const handleDialogClose = () => {
     setQueueToDelete(null);
   };
+
+  const sortKey = (sortBy: SortBy) =>
+    colConfigs.find((column) => column.sortBy === sortBy)?.key || "queue";
 
   return (
     <React.Fragment>
@@ -242,9 +175,16 @@ export default function QueuesOverviewTable(props: Props) {
                   >
                     {cfg.sortBy !== SortBy.None ? (
                       <TableSortLabel
-                        active={sortBy === cfg.sortBy}
-                        direction={sortDir}
-                        onClick={createSortClickHandler(cfg.sortBy)}
+                        active={props.sortBy === cfg.key}
+                        direction={props.sortDir}
+                        onClick={() => {
+                          const nextDir =
+                            props.sortBy === cfg.key &&
+                            props.sortDir === SortDirection.Asc
+                              ? SortDirection.Desc
+                              : SortDirection.Asc;
+                          props.onSortChange(sortKey(cfg.sortBy), nextDir);
+                        }}
                       >
                         {cfg.label}
                       </TableSortLabel>
@@ -256,7 +196,7 @@ export default function QueuesOverviewTable(props: Props) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {sortQueues(props.queues, cmpFunc).map((q) => (
+            {props.queues.map((q) => (
               <Row
                 key={q.queue}
                 queue={q}
