@@ -46,6 +46,7 @@ const useStyles = makeStyles((theme) => ({
 interface Props {
   queue: string; // name of the queue.
   totalTaskCount: number; // totoal number of tasks in the given state.
+  search?: string;
   taskState: TaskState;
   loading: boolean;
   error: string;
@@ -193,6 +194,16 @@ export default function TasksTable(props: Props) {
 
   usePolling(fetchData, pollInterval);
 
+  const filteredTasks = props.search
+    ? props.tasks.filter((task) => {
+        const query = props.search!.toLowerCase();
+        return (
+          task.id.toLowerCase().includes(query) ||
+          task.type.toLowerCase().includes(query)
+        );
+      })
+    : props.tasks;
+
   if (props.error.length > 0) {
     return (
       <Alert severity="error" className={classes.alert}>
@@ -201,7 +212,7 @@ export default function TasksTable(props: Props) {
       </Alert>
     );
   }
-  if (props.tasks.length === 0) {
+  if (filteredTasks.length === 0) {
     return (
       <Alert severity="info" className={classes.alert}>
         <AlertTitle>Info</AlertTitle>
@@ -214,7 +225,7 @@ export default function TasksTable(props: Props) {
     );
   }
 
-  const rowCount = props.tasks.length;
+  const rowCount = filteredTasks.length;
   const numSelected = selectedIds.length;
   return (
     <div>
@@ -268,7 +279,7 @@ export default function TasksTable(props: Props) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {props.tasks.map((task) => {
+            {filteredTasks.map((task) => {
               return props.renderRow({
                 key: task.id,
                 task: task,

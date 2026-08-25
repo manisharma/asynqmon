@@ -24,6 +24,7 @@ import Tooltip from "../components/Tooltip";
 import SplitButton from "../components/SplitButton";
 import { usePolling } from "../hooks";
 import DailyStatsChart from "../components/DailyStatsChart";
+import { SortDirection } from "../types/table";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -110,6 +111,8 @@ function DashboardView(props: Props) {
   const [search, setSearch] = useState("");
   const [taskID, setTaskID] = useState("");
   const [appliedTaskID, setAppliedTaskID] = useState("");
+  const [sortBy, setSortBy] = useState("queue");
+  const [sortDir, setSortDir] = useState<SortDirection>(SortDirection.Asc);
 
   const listQueues = useCallback(
     () =>
@@ -118,8 +121,10 @@ function DashboardView(props: Props) {
         size: pageSize,
         search,
         task_id: appliedTaskID,
+        sort_by: sortBy,
+        sort_dir: sortDir,
       }),
-    [appliedTaskID, currentPage, listQueuesAsync, pageSize, search]
+    [appliedTaskID, currentPage, listQueuesAsync, pageSize, search, sortBy, sortDir]
   );
   usePolling(listQueues, pollInterval);
 
@@ -284,6 +289,13 @@ function DashboardView(props: Props) {
               }}
               onTaskIDSearch={() => {
                 setAppliedTaskID(taskID);
+                setCurrentPage(1);
+              }}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSortChange={(nextSortBy, nextSortDir) => {
+                setSortBy(nextSortBy);
+                setSortDir(nextSortDir);
                 setCurrentPage(1);
               }}
             />

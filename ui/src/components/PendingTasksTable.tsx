@@ -57,6 +57,7 @@ type ReduxProps = ConnectedProps<typeof connector>;
 interface Props {
   queue: string;
   totalTaskCount: number; // total number of pending tasks
+  search?: string;
 }
 
 const columns: TableColumn[] = [
