@@ -569,7 +569,7 @@ export async function listAggregatingTasks(
   gname: string,
   pageOpts?: PaginationOptions
 ): Promise<ListAggregatingTasksResponse> {
-  let url = `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks`;
+  let url = `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks`;
   if (pageOpts) {
     url += `?${queryString.stringify(pageOpts)}`;
   }
@@ -652,7 +652,7 @@ export async function deleteAggregatingTask(
 ): Promise<void> {
   await axios({
     method: "delete",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks/${taskId}`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks/${taskId}`,
   });
 }
 
@@ -663,7 +663,7 @@ export async function batchDeleteAggregatingTasks(
 ): Promise<BatchDeleteTasksResponse> {
   const resp = await axios({
     method: "post",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks:batch_delete`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks:batch_delete`,
     data: {
       task_ids: taskIds,
     },
@@ -677,7 +677,7 @@ export async function deleteAllAggregatingTasks(
 ): Promise<DeleteAllTasksResponse> {
   const resp = await axios({
     method: "delete",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks:delete_all`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks:delete_all`,
   });
   return resp.data;
 }
@@ -689,7 +689,7 @@ export async function runAggregatingTask(
 ): Promise<void> {
   await axios({
     method: "post",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks/${taskId}:run`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks/${taskId}:run`,
   });
 }
 
@@ -700,7 +700,7 @@ export async function batchRunAggregatingTasks(
 ): Promise<BatchRunTasksResponse> {
   const resp = await axios({
     method: "post",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks:batch_run`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks:batch_run`,
     data: {
       task_ids: taskIds,
     },
@@ -714,7 +714,7 @@ export async function runAllAggregatingTasks(
 ): Promise<RunAllTasksResponse> {
   const resp = await axios({
     method: "post",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks:run_all`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks:run_all`,
   });
   return resp.data;
 }
@@ -726,7 +726,7 @@ export async function archiveAggregatingTask(
 ): Promise<void> {
   await axios({
     method: "post",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks/${taskId}:archive`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks/${taskId}:archive`,
   });
 }
 
@@ -737,7 +737,7 @@ export async function batchArchiveAggregatingTasks(
 ): Promise<BatchArchiveTasksResponse> {
   const resp = await axios({
     method: "post",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks:batch_archive`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks:batch_archive`,
     data: {
       task_ids: taskIds,
     },
@@ -751,7 +751,7 @@ export async function archiveAllAggregatingTasks(
 ): Promise<ArchiveAllTasksResponse> {
   const resp = await axios({
     method: "post",
-    url: `${getBaseUrl()}/queues/${qname}/groups/${gname}/aggregating_tasks:archive_all`,
+    url: `${getBaseUrl()}/queues/${qname}/groups/${encodeURIComponent(gname)}/aggregating_tasks:archive_all`,
   });
   return resp.data;
 }

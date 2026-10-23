@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -143,7 +144,7 @@ func (h *HTTPHandler) RootPath() string {
 var staticContents embed.FS
 
 func muxRouter(opts Options, rc redis.UniversalClient, inspector *asynq.Inspector) *mux.Router {
-	router := mux.NewRouter().PathPrefix(opts.RootPath).Subrouter()
+	router := mux.NewRouter().UseEncodedPath().PathPrefix(opts.RootPath).Subrouter()
 
 	var payloadFmt PayloadFormatter = DefaultPayloadFormatter
 	if opts.PayloadFormatter != nil {
@@ -161,6 +162,7 @@ func muxRouter(opts Options, rc redis.UniversalClient, inspector *asynq.Inspecto
 	}
 
 	api := router.PathPrefix("/api").Subrouter()
+	api.Use(decodePathVariables)
 
 	// Queue endpoints.
 	api.HandleFunc("/queues", newListQueuesHandlerFunc(inspector, rc)).Methods("GET")
@@ -271,6 +273,22 @@ func muxRouter(opts Options, rc redis.UniversalClient, inspector *asynq.Inspecto
 	}
 
 	return router
+}
+
+func decodePathVariables(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		decoded := make(map[string]string, len(vars))
+		for key, value := range vars {
+			value, err := url.PathUnescape(value)
+			if err != nil {
+				http.Error(w, "invalid URL path encoding", http.StatusBadRequest)
+				return
+			}
+			decoded[key] = value
+		}
+		h.ServeHTTP(w, mux.SetURLVars(r, decoded))
+	})
 }
 
 // restrictToReadOnly is a middleware function to restrict users to perform only GET requests.
