@@ -7,6 +7,9 @@
 Asynqmon is a web UI tool for monitoring and administering [Asynq](https://github.com/hibiken/asynq) queues and tasks.
 It supports integration with [Prometheus](https://prometheus.io) to display time-series data.
 
+Aggregation group names may contain `/` and other URL-reserved characters. API clients must
+percent-encode group names as a single path segment; the Web UI handles this automatically.
+
 Asynqmon is both a library that you can include in your web application, as well as a binary that you can simply install and run.
 
 ## Version Compatibility
