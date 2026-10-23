@@ -8,7 +8,7 @@ import DeleteIcon from "@material-ui/icons/Delete";
 import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
 import MoreHorizIcon from "@material-ui/icons/MoreHoriz";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
-import React from "react";
+import React, { useCallback } from "react";
 import { connect, ConnectedProps } from "react-redux";
 import { useHistory } from "react-router-dom";
 import { taskRowsPerPageChange } from "../actions/settingsActions";
@@ -181,8 +181,12 @@ function Row(props: RowProps) {
 }
 
 function AggregatingTasksTable(props: Props & ReduxProps) {
-  const listTasks = (qname: string, pgn?: PaginationOptions) =>
-    props.listAggregatingTasksAsync(qname, props.selectedGroup, pgn);
+  const { listAggregatingTasksAsync, selectedGroup } = props;
+  const listTasks = useCallback(
+    (qname: string, pgn?: PaginationOptions) =>
+      listAggregatingTasksAsync(qname, selectedGroup, pgn),
+    [listAggregatingTasksAsync, selectedGroup]
+  );
 
   const deleteAllTasks = (qname: string) =>
     props.deleteAllAggregatingTasksAsync(qname, props.selectedGroup);
