@@ -8,6 +8,10 @@ The Asynqmon UI was bootstrapped using [Create React App](https://github.com/fac
 
 Instead of plain JavaScript, we use [TypeScript](https://www.typescriptlang.org/) to ensure typed code.
 
+Task tables fetch immediately when the queue, aggregation group, or pagination changes,
+then refresh at the configured polling interval. Callbacks passed to `usePolling`
+must remain stable across request-state updates to avoid restarting polling on every response.
+
 ## Development environment
 
 To work with the React UI code, you will need to have the following tools installed:
